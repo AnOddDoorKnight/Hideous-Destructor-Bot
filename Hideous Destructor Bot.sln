@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.3.32804.467
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Core", "Hideous Destructor Bot Core\Core.csproj", "{9CDD765F-D55D-44BD-87D2-E4AF1503ED24}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Console Interaction", "Console Interaction\Console Interaction.csproj", "{5AFC873C-6DD2-40DC-A651-09215E75E3E0}"
+	ProjectSection(ProjectDependencies) = postProject
+		{9CDD765F-D55D-44BD-87D2-E4AF1503ED24} = {9CDD765F-D55D-44BD-87D2-E4AF1503ED24}
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9CDD765F-D55D-44BD-87D2-E4AF1503ED24}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9CDD765F-D55D-44BD-87D2-E4AF1503ED24}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9CDD765F-D55D-44BD-87D2-E4AF1503ED24}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9CDD765F-D55D-44BD-87D2-E4AF1503ED24}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5AFC873C-6DD2-40DC-A651-09215E75E3E0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5AFC873C-6DD2-40DC-A651-09215E75E3E0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5AFC873C-6DD2-40DC-A651-09215E75E3E0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5AFC873C-6DD2-40DC-A651-09215E75E3E0}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {4380B83E-45E9-4505-B032-8F3D0F42640B}
+	EndGlobalSection
+EndGlobal
