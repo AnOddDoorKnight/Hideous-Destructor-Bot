@@ -42,10 +42,9 @@ public class BotState
 			XmlNodeList contentNodeData = document.LastChild!.ChildNodes;
 			for (int i = 0; i < contentNodeData.Count; i++)
 			{
-				XmlNode currentNode = contentNodeData.Item(i)!;
-				contents.Add(currentNode.Name, currentNode.Value!);
+				contents.Add(contentNodeData[i]!.Name, contentNodeData[i]!.InnerText);
 			}
-			using XmlWriter writer = XmlWriter.Create(PersistentData.FullName);
+			using XmlWriter writer = XmlWriter.Create(PersistentData.FullName, new XmlWriterSettings() { Indent = true, IndentChars = "\t" });
 			document.WriteTo(writer);
 		}
 		else
@@ -87,8 +86,12 @@ public class BotState
 		document.LastChild!.RemoveAll();
 		using var enumerator = contents.GetEnumerator();
 		while (enumerator.MoveNext())
-			document.CreateElement(enumerator.Current.Key).InnerText = enumerator.Current.Value;
-		using XmlWriter writer = XmlWriter.Create(PersistentData.FullName);
+		{
+			var element = document.CreateElement(enumerator.Current.Key);
+			element.InnerText = enumerator.Current.Value;
+			document.LastChild!.AppendChild(element);
+		}
+		using XmlWriter writer = XmlWriter.Create(PersistentData.FullName, new XmlWriterSettings() { Indent = true, IndentChars = "\t" });
 		document.WriteTo(writer);
 	}
 }

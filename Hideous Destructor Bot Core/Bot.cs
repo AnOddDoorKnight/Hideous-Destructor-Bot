@@ -14,11 +14,7 @@ public class Bot : IDisposable
 	public readonly string TokenID;
 	public readonly DiscordSocketClient socketClient;
 	private Thread? autoUpdateThread;
-	public event Func<LogMessage, Task> Log = (msg) =>
-	{
-		Console.WriteLine(msg);
-		return Task.CompletedTask;
-	};
+	public event Func<LogMessage, Task> Log;
 	public async Task SendLog(LogMessage msg) => await Log.Invoke(msg);
 
 	public readonly BotState botState = new() { AutoFlush = true };
@@ -48,10 +44,19 @@ public class Bot : IDisposable
 			AlwaysDownloadUsers = true,
 			GatewayIntents = GatewayIntents.All,
 		});
+		Log += (msg) =>
+		{
+			Console.WriteLine(msg);
+			return Task.CompletedTask;
+		};
 		socketClient.Log += (message) =>
 		{
 			return Log.Invoke(message);
 		};
+		// var option = new SlashCommandBuilder();
+		// option.WithName("check-alive");
+		// option.WithDescription("Checks if the bot is alive");
+		// await socketClient.Rest.CreateGlobalCommand(option.Build());
 		if (autoUpdate)
 		{
 			autoUpdateThread = new Thread(async () =>

@@ -24,7 +24,7 @@ public class Startup : IPlugin
 		//bot.socketClient.CreateGlobalApplicationCommandAsync()
 		bot.socketClient.SlashCommandExecuted += async (command) =>
 		{
-			await command.FollowupAsync("I am alive, thanks for checking! Rock and Stone!");
+			await command.RespondAsync("I am alive, thanks for checking! Rock and Stone!");
 		};
 	}
 

@@ -16,7 +16,7 @@ public sealed class MemeOfTheWeek : IPlugin
 	// Do wednesday
 	internal static bool PassedDay(BotState state)
 	{
-		if (state.Contents.TryGetValue(timeKey, out var value))
+		if (state.Contents.TryGetValue(timeKey, out string? value))
 		{
 			DateTime time = DateTime.Parse(value);
 			TimeSpan span = DateTime.Today - time;

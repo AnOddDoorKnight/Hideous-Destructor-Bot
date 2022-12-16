@@ -32,6 +32,7 @@ public static class Interface
 		_ = currentBot.AddPlugin(new MemeOfTheWeek(currentBot, 334151720546598915, 1048792493711425608, 1053082648840519750));
 		_ = currentBot.AddPlugin(new DebugQueue(currentBot, 334151720546598915, 1053370494071607316));
 		_ = currentBot.AddPlugin(new Startup(currentBot, 334151720546598915));
+		_ = currentBot.AddPlugin(new RockAndStone());
 
 		// End
 		Console.WriteLine("Ending on exit");
