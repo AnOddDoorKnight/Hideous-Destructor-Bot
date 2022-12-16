@@ -1,5 +1,6 @@
 ﻿using Discord;
 using Discord.WebSocket;
+using HideousDestructor.DiscordServer.Plugins;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,25 +14,27 @@ public static class Interface
 #pragma warning disable CS8618
 	public static Bot currentBot;
 #pragma warning restore CS8618
-	static void Main(string[] arguments)
+	static async Task Main(string[] arguments)
 	{
 		// Find token
 		if (arguments.Length > 0)
-			currentBot = new Bot(arguments[0]);
+			currentBot = new Bot(arguments[0], true);
 		else
 		{
 			Console.Write("Type in the bot token: ");
 			string tokenString = Console.ReadLine() ?? "";
-			currentBot = new Bot(tokenString);
+			currentBot = new Bot(tokenString, true);
 		}
 
-		Console.ReadLine();
-		currentBot.socketClient!.MessageReceived += (message) =>
-		{
-			Console.WriteLine(message);
-			return Task.CompletedTask;
-		};
-		currentBot.socketClient!.Rest.GetGuildAsync(334151720546598915).Result.GetTextChannelAsync(734127505723621417).Result.SendMessageAsync("Haha you foolish mortals").Wait();
+		await currentBot.Connect();
+		//_ = currentBot.AddPlugin(new Startup(currentBot, 334151720546598915));
+		_ = currentBot.AddPlugin(new MemeOfTheWeek(currentBot, 334151720546598915, 1048792493711425608, 1053082648840519750));
+		//currentBot.socketClient.MessageReceived += (message) =>
+		//{
+		//	Console.WriteLine(message);
+		//	return Task.CompletedTask;
+		//};
+		//currentBot.socketClient.Rest.GetGuildAsync(334151720546598915).Result.GetTextChannelAsync(734127505723621417).Result.SendMessageAsync("Haha you foolish mortals").Wait();
 		//var channel = currentBot.socketClient!.Rest.GetUserAsync(497048142848720897).Result.CreateDMChannelAsync().Result;
 		//string output;
 		//do
@@ -56,6 +59,5 @@ public static class Interface
 		Console.ReadLine();
 		currentBot.Dispose();
 	}
-
-
 }
+
