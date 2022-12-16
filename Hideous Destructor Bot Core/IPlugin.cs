@@ -5,11 +5,9 @@ using System.Threading.Tasks;
 
 namespace HideousDestructor.DiscordServer;
 
-public interface IPlugin
+public interface IPlugin : IEquatable<IPlugin>
 {
 	string Key { get; }
-
-	IEnumerable<SocketApplicationCommand>? Commands => null;
 
 	void AddFunctionality(Bot bot);
 	Task UpdateFunctionality(Bot bot)
@@ -17,4 +15,9 @@ public interface IPlugin
 		return Task.CompletedTask;
 	}
 	void RemoveFunctionality(Bot bot);
+
+	bool IEquatable<IPlugin>.Equals(IPlugin? other)
+	{
+		return other is not null && Key == other.Key;
+	}
 }

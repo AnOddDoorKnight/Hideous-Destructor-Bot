@@ -11,39 +11,26 @@ namespace HideousDestructor.DiscordServer.Plugins;
 
 public sealed class MemeOfTheWeek : IPlugin
 {
+	const string timeKey = "MemeOfTheWeek",
+		winnerKey = "MemeOfTheWeek-Winners";
 	// Do wednesday
-	public static bool PassedDay 
-	{ 
-		get
+	internal static bool PassedDay(BotState state)
+	{
+		if (state.Contents.TryGetValue(timeKey, out var value))
 		{
-			FileInfo fileInfo = GetFileInfo();
-			if (fileInfo.Exists)
-			{
-				DateTime time = DateTime.Parse(File.ReadAllText(fileInfo.FullName));
-				TimeSpan span = DateTime.Today - time;
-				if (span.TotalDays >= 7f)
-					return false;
-				return true;
-			}
-			SetToToday(fileInfo);
-			return false;
+			DateTime time = DateTime.Parse(value);
+			TimeSpan span = DateTime.Today - time;
+			if (span.TotalDays >= 7f)
+				return false;
+			return true;
 		}
+		SetToToday(state);
+		return false;
 	}
-	private static void SetToToday(FileInfo info)
+	private static void SetToToday(BotState botState)
 	{
-		File.WriteAllText(info.FullName, DateTime.Today.ToString());
+		botState[timeKey] = DateTime.Today.ToString();
 	}
-	private static FileInfo GetFileInfo()
-	{
-		DirectoryInfo info = new(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
-		info = info.CreateSubdirectory("BotData");
-		return new FileInfo(info.FullName + "/state.txt");
-	}
-
-	public IEnumerable<SocketApplicationCommand>? Commands = new SocketApplicationCommand[]
-	{
-
-	};
 
 	public SocketGuild CurrentGuild { get; private set; }
 	public SocketTextChannel Submissions { get; private set; }
@@ -96,8 +83,9 @@ public sealed class MemeOfTheWeek : IPlugin
 
 	async Task IPlugin.UpdateFunctionality(Bot bot)
 	{
-		if (!PassedDay)
-			await PerformLeaderboard();
+		if (PassedDay(bot.botState))
+			return;
+		await DoLeaderboard(bot);
 	}
 
 	void IPlugin.RemoveFunctionality(Bot bot)
@@ -105,9 +93,9 @@ public sealed class MemeOfTheWeek : IPlugin
 
 	}
 
-	private async Task PerformLeaderboard()
+	public async Task DoLeaderboard(Bot bot)
 	{
-		const int winners = 3;
+		int winners = int.Parse(bot.botState.GetOrDefault(winnerKey, "3"));
 		new List<IMessage>(Leaderboard.GetMessagesAsync()
 			.ToEnumerable().SelectMany(collection => collection)).ForEach(msg => msg.DeleteAsync().Wait());
 		List<IMessage> allMessages = new(Submissions.GetMessagesAsync()
@@ -117,17 +105,16 @@ public sealed class MemeOfTheWeek : IPlugin
 		{
 			if (allMessages[i].Attachments.Count > 0)
 			{
-				Console.WriteLine($"Detected attachment count from user {allMessages[i].Author.Username} with {allMessages[i].Attachments.Count} attachments.");
 				var attachments = FileDownloader.GetImages(allMessages[i].Attachments).Result.AsAttachments();
 				await Leaderboard.SendFilesAsync(attachments, $"**{i + 1}. {allMessages[i].Author.Username} with {allMessages[i].Reactions[Emote].ReactionCount - 1} votes**\n-----:\n\n{allMessages[i].Content}");
 				attachments.DisposeAll();
 			}
 			else
 				await Leaderboard.SendMessageAsync($"**{i + 1}. {allMessages[i].Author.Username} with {allMessages[i].Reactions[Emote].ReactionCount - 1} votes**\n-----:\n\n{allMessages[i].Content}");
-			
+
 		}
-		SetToToday(GetFileInfo());
-		allMessages.ForEach(msg => msg.DeleteAsync().Wait());
+		SetToToday(bot.botState);
+		await Submissions.DeleteMessagesAsync(allMessages);
 	}
 
 	private async Task MessageRecieved(SocketMessage socketMessage)

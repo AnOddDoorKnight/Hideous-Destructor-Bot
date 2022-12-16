@@ -1,4 +1,5 @@
-﻿using Discord.WebSocket;
+﻿using Discord;
+using Discord.WebSocket;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,18 +11,21 @@ namespace HideousDestructor.DiscordServer.Plugins;
 public class Startup : IPlugin
 {
 	public SocketGuild CurrentGuild { get; private set; }
-	public SocketTextChannel ChannelTarget { get; private set; }
 	public Startup(Bot bot, ulong guildID)
 	{
 		CurrentGuild = bot.socketClient.GetGuild(guildID);
-		ChannelTarget = CurrentGuild.GetTextChannel(734127505723621417);
 	}
 
 	public string Key => throw new NotImplementedException();
 
 	public void AddFunctionality(Bot bot)
 	{
-		ChannelTarget.SendMessageAsync(DateTime.Now.ToString()).Wait();
+
+		//bot.socketClient.CreateGlobalApplicationCommandAsync()
+		bot.socketClient.SlashCommandExecuted += async (command) =>
+		{
+			await command.FollowupAsync("I am alive, thanks for checking! Rock and Stone!");
+		};
 	}
 
 	public void RemoveFunctionality(Bot bot)

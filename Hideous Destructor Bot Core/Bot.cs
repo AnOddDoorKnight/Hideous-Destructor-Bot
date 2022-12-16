@@ -4,8 +4,6 @@ using Discord.WebSocket;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -13,47 +11,32 @@ namespace HideousDestructor.DiscordServer;
 
 public class Bot : IDisposable
 {
-	//static Bot()
-	//{
-	//	CreateTextWriter();
-	//}
-	//private static void CreateTextWriter()
-	//{
-	//	DirectoryInfo info = new(Directory.GetCurrentDirectory());
-	//	info = info.CreateSubdirectory("Debug");
-	//	TextWriterTraceListener listener = new($"{info.FullName}/{DateTime.Now}.txt");
-	//	Trace.Listeners.Add(listener);
-	//	Debug.AutoFlush = true;
-	//}
-
-
-
 	public readonly string TokenID;
 	public readonly DiscordSocketClient socketClient;
 	private Thread? autoUpdateThread;
+	public event Func<LogMessage, Task> Log = (msg) =>
+	{
+		Console.WriteLine(msg);
+		return Task.CompletedTask;
+	};
+	public async Task SendLog(LogMessage msg) => await Log.Invoke(msg);
 
-	private List<IPlugin> activePlugins = new();
-	public async Task AddPlugin(IPlugin plugin)
+	public readonly BotState botState = new() { AutoFlush = true };
+
+	public IReadOnlyList<IPlugin> ActivePlugins => activePlugins;
+	private readonly List<IPlugin> activePlugins = new();
+	public Task AddPlugin(IPlugin plugin)
 	{
 		activePlugins.Add(plugin);
 		plugin.AddFunctionality(this);
-		if (plugin.Commands == null)
-			return;
-		//var list = socketClient.GetGlobalApplicationCommandsAsync().Result.ToList();
-		//using var enumerator = plugin.Commands.GetEnumerator();
-		//ApplicationCommandOptionChoiceProperties applicationCommandOptionChoiceProperties = new()
-		//{
-		//	
-		//};
-		//while (enumerator.MoveNext())
-		//	if (!list.Contains(enumerator.Current))
-		//		socketClient.CreateGlobalApplicationCommandAsync();
-			
+		return Task.CompletedTask;
 	}
-	//public void RemovePlugin(IPlugin plugin)
-	//{
-	//
-	//}
+	public Task RemovePlugin(IPlugin plugin)
+	{
+		activePlugins.Remove(plugin);
+		plugin.RemoveFunctionality(this);
+		return Task.CompletedTask;
+	}
 
 	public Bot(string tokenID, bool autoUpdate)
 	{
@@ -61,15 +44,13 @@ public class Bot : IDisposable
 		TokenID = tokenID;
 		socketClient = new DiscordSocketClient(new DiscordSocketConfig()
 		{
-			LogLevel = LogSeverity.Warning,
+			LogLevel = LogSeverity.Verbose,
 			AlwaysDownloadUsers = true,
-			GatewayIntents = GatewayIntents.AllUnprivileged,
+			GatewayIntents = GatewayIntents.All,
 		});
 		socketClient.Log += (message) =>
 		{
-			Console.WriteLine(message);
-			//xDebug.WriteLine(message);
-			return Task.CompletedTask;
+			return Log.Invoke(message);
 		};
 		if (autoUpdate)
 		{
@@ -99,16 +80,6 @@ public class Bot : IDisposable
 		TaskCompletionSource source = new();
 		socketClient.Ready += Wait;
 		await source.Task;
-		//IReadOnlyCollection<SocketApplicationCommand> commands = await socketClient.GetGlobalApplicationCommandsAsync();
-		var option = new SlashCommandBuilder();
-		option.WithName("check-alive");
-		option.WithDescription("Checks if the bot is alive");
-		await socketClient.Rest.CreateGlobalCommand(option.Build());//socketClient.CreateGlobalApplicationCommandAsync(option);
-		socketClient.SlashCommandExecuted += (command) =>
-		{
-			return command.FollowupAsync("I am alive, thanks for checking! Rock and Stone");
-		};
-
 		Task Wait()
 		{
 			source.SetResult();
