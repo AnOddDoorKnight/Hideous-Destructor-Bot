@@ -6,8 +6,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.IO;
-using System.Text;
-using System.Reflection;
 
 namespace HideousDestructor.DiscordServer.Plugins;
 
@@ -99,7 +97,7 @@ public sealed class MemeOfTheWeek : IPlugin
 	async Task IPlugin.UpdateFunctionality(Bot bot)
 	{
 		if (!PassedDay)
-			PerformLeaderboard();
+			await PerformLeaderboard();
 	}
 
 	void IPlugin.RemoveFunctionality(Bot bot)
@@ -107,7 +105,7 @@ public sealed class MemeOfTheWeek : IPlugin
 
 	}
 
-	private void PerformLeaderboard()
+	private async Task PerformLeaderboard()
 	{
 		const int winners = 3;
 		new List<IMessage>(Leaderboard.GetMessagesAsync()
@@ -117,7 +115,16 @@ public sealed class MemeOfTheWeek : IPlugin
 			.OrderByDescending(message => message.Reactions[Emote].ReactionCount));
 		for (int i = 0; i < Math.Min(allMessages.Count, winners); i++)
 		{
-			Leaderboard.SendMessageAsync($"**{i + 1}. {allMessages[i].Author.Username} with {allMessages[i].Reactions[Emote].ReactionCount - 1} votes**{(allMessages[i].Attachments.Any() ? $"\n{allMessages[i].Attachments.First().Url}" : "")}\n-----:\n\n{allMessages[i].Content}").Wait();
+			if (allMessages[i].Attachments.Count > 0)
+			{
+				Console.WriteLine($"Detected attachment count from user {allMessages[i].Author.Username} with {allMessages[i].Attachments.Count} attachments.");
+				var attachments = FileDownloader.GetImages(allMessages[i].Attachments).Result.AsAttachments();
+				await Leaderboard.SendFilesAsync(attachments, $"**{i + 1}. {allMessages[i].Author.Username} with {allMessages[i].Reactions[Emote].ReactionCount - 1} votes**\n-----:\n\n{allMessages[i].Content}");
+				attachments.DisposeAll();
+			}
+			else
+				await Leaderboard.SendMessageAsync($"**{i + 1}. {allMessages[i].Author.Username} with {allMessages[i].Reactions[Emote].ReactionCount - 1} votes**\n-----:\n\n{allMessages[i].Content}");
+			
 		}
 		SetToToday(GetFileInfo());
 		allMessages.ForEach(msg => msg.DeleteAsync().Wait());
@@ -132,4 +139,5 @@ public sealed class MemeOfTheWeek : IPlugin
 		await socketMessage.AddReactionAsync(Emote);
 
 	}
+
 }

@@ -13,18 +13,18 @@ namespace HideousDestructor.DiscordServer;
 
 public class Bot : IDisposable
 {
-	static Bot()
-	{
-		CreateTextWriter();
-	}
-	private static void CreateTextWriter()
-	{
-		DirectoryInfo info = new(Directory.GetCurrentDirectory());
-		info = info.CreateSubdirectory("Debug");
-		TextWriterTraceListener listener = new($"{info.FullName}/{DateTime.Now}.txt");
-		Trace.Listeners.Add(listener);
-		Debug.AutoFlush = true;
-	}
+	//static Bot()
+	//{
+	//	CreateTextWriter();
+	//}
+	//private static void CreateTextWriter()
+	//{
+	//	DirectoryInfo info = new(Directory.GetCurrentDirectory());
+	//	info = info.CreateSubdirectory("Debug");
+	//	TextWriterTraceListener listener = new($"{info.FullName}/{DateTime.Now}.txt");
+	//	Trace.Listeners.Add(listener);
+	//	Debug.AutoFlush = true;
+	//}
 
 
 
@@ -61,19 +61,18 @@ public class Bot : IDisposable
 		TokenID = tokenID;
 		socketClient = new DiscordSocketClient(new DiscordSocketConfig()
 		{
-			LogLevel = LogSeverity.Verbose,
+			LogLevel = LogSeverity.Warning,
 			AlwaysDownloadUsers = true,
 			GatewayIntents = GatewayIntents.AllUnprivileged,
 		});
 		socketClient.Log += (message) =>
 		{
 			Console.WriteLine(message);
-			Debug.WriteLine(message);
+			//xDebug.WriteLine(message);
 			return Task.CompletedTask;
 		};
 		if (autoUpdate)
 		{
-
 			autoUpdateThread = new Thread(async () =>
 			{
 				TaskCompletionSource source = new();
@@ -81,8 +80,8 @@ public class Bot : IDisposable
 				await source.Task;
 				while (true)
 				{
-					await Update();
 					await Task.Delay(10000);
+					await Update();
 				}
 				Task Wait()
 				{
@@ -100,6 +99,16 @@ public class Bot : IDisposable
 		TaskCompletionSource source = new();
 		socketClient.Ready += Wait;
 		await source.Task;
+		//IReadOnlyCollection<SocketApplicationCommand> commands = await socketClient.GetGlobalApplicationCommandsAsync();
+		var option = new SlashCommandBuilder();
+		option.WithName("check-alive");
+		option.WithDescription("Checks if the bot is alive");
+		await socketClient.Rest.CreateGlobalCommand(option.Build());//socketClient.CreateGlobalApplicationCommandAsync(option);
+		socketClient.SlashCommandExecuted += (command) =>
+		{
+			return command.FollowupAsync("I am alive, thanks for checking! Rock and Stone");
+		};
+
 		Task Wait()
 		{
 			source.SetResult();
