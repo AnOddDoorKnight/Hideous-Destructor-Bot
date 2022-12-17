@@ -8,13 +8,13 @@ using System.Xml;
 
 namespace HideousDestructor.DiscordServer;
 
-public class BotState
+public class GuildConfig
 {
 	private static DirectoryInfo CurrentDirectory { get; } =
 		new DirectoryInfo(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData))
 			.CreateSubdirectory("Hideous Destructor Bot");
-	public static FileInfo PersistentData { get; } =
-		new FileInfo(CurrentDirectory.FullName + "/botState.xml");
+	public FileInfo PersistentData(ulong guildID) =>
+		new FileInfo(CurrentDirectory.FullName + $"/{guildID}.xml");
 	public static FileInfo TokenDirectory { get; } =
 		new FileInfo(CurrentDirectory.FullName + "/token.txt");
 	public static string? Token
@@ -31,26 +31,28 @@ public class BotState
 	public IReadOnlyDictionary<string, string> Contents => contents;
 	private readonly Dictionary<string, string> contents;
 	public bool AutoFlush { get; set; } = false;
+	private readonly ulong guildID;
 
-	public BotState()
+	public GuildConfig(ulong guildID)
 	{
+		this.guildID = guildID;
 		contents = new Dictionary<string, string>();
-		if (PersistentData.Exists)
+		if (PersistentData(guildID).Exists)
 		{
 			XmlDocument document = new XmlDocument();
-			document.Load(PersistentData.FullName);
+			document.Load(PersistentData(guildID).FullName);
 			XmlNodeList contentNodeData = document.LastChild!.ChildNodes;
 			for (int i = 0; i < contentNodeData.Count; i++)
 			{
 				contents.Add(contentNodeData[i]!.Name, contentNodeData[i]!.InnerText);
 			}
-			using XmlWriter writer = XmlWriter.Create(PersistentData.FullName, new XmlWriterSettings() { Indent = true, IndentChars = "\t" });
+			using XmlWriter writer = XmlWriter.Create(PersistentData(guildID).FullName, new XmlWriterSettings() { Indent = true, IndentChars = "\t" });
 			document.WriteTo(writer);
 		}
 		else
 		{
-			using XmlWriter writer = XmlWriter.Create(PersistentData.FullName);
-			writer.WriteStartElement("BotState");
+			using XmlWriter writer = XmlWriter.Create(PersistentData(guildID).FullName);
+			writer.WriteStartElement("GuildConfig");
 			writer.WriteEndElement();
 		}
 	}
@@ -82,7 +84,7 @@ public class BotState
 	public void Flush()
 	{
 		XmlDocument document = new();
-		document.Load(PersistentData.FullName);
+		document.Load(PersistentData(guildID).FullName);
 		document.LastChild!.RemoveAll();
 		using var enumerator = contents.GetEnumerator();
 		while (enumerator.MoveNext())
@@ -91,7 +93,7 @@ public class BotState
 			element.InnerText = enumerator.Current.Value;
 			document.LastChild!.AppendChild(element);
 		}
-		using XmlWriter writer = XmlWriter.Create(PersistentData.FullName, new XmlWriterSettings() { Indent = true, IndentChars = "\t" });
+		using XmlWriter writer = XmlWriter.Create(PersistentData(guildID).FullName, new XmlWriterSettings() { Indent = true, IndentChars = "\t" });
 		document.WriteTo(writer);
 	}
 }

@@ -9,12 +9,12 @@ using System.IO;
 
 namespace HideousDestructor.DiscordServer.Plugins;
 
-public sealed class MemeOfTheWeek : IPlugin
+public sealed class MemeOfTheWeek : Plugin
 {
 	const string timeKey = "MemeOfTheWeek",
 		winnerKey = "MemeOfTheWeek-Winners";
 	// Do wednesday
-	internal static bool PassedDay(BotState state)
+	internal static bool PassedDay(GuildConfig state)
 	{
 		if (state.Contents.TryGetValue(timeKey, out string? value))
 		{
@@ -27,27 +27,24 @@ public sealed class MemeOfTheWeek : IPlugin
 		SetToToday(state);
 		return false;
 	}
-	private static void SetToToday(BotState botState)
+	private static void SetToToday(GuildConfig botState)
 	{
 		botState[timeKey] = DateTime.Today.ToString();
 	}
-
-	public SocketGuild CurrentGuild { get; private set; }
 	public SocketTextChannel Submissions { get; private set; }
 	public SocketTextChannel Leaderboard { get; private set; }
 	public IEmote Emote { get; private set; }
 	//private readonly List<IMessage> messages = new();
-	public MemeOfTheWeek(Bot bot, ulong guildID, ulong submissionsID, ulong leaderboardID)
+	public MemeOfTheWeek(Bot bot, ulong guildID, ulong submissionsID, ulong leaderboardID) : base(bot, guildID)
 	{
-		CurrentGuild = bot.socketClient.GetGuild(guildID);
 		Submissions = CurrentGuild.GetTextChannel(submissionsID);
 		Leaderboard = CurrentGuild.GetTextChannel(leaderboardID);
 		Emote = CurrentGuild.Emotes.First(emote => emote.Name == "upvote");
 	}
 
-	public string Key => nameof(MemeOfTheWeek);
+	public override string Key => nameof(MemeOfTheWeek);
 
-	public void AddFunctionality(Bot bot)
+	protected internal override Task OnEnable(Bot bot)
 	{
 		bot.socketClient.MessageReceived += MessageRecieved;
 
@@ -79,23 +76,19 @@ public sealed class MemeOfTheWeek : IPlugin
 			await Task.WhenAll(queuedMessages);
 		});
 		addReactions.Start();
+		return Task.CompletedTask;
 	}
 
-	async Task IPlugin.UpdateFunctionality(Bot bot)
+	protected internal override async Task Update(Bot bot)
 	{
-		if (PassedDay(bot.botState))
+		if (PassedDay(bot.Configs[CurrentGuild.Id]))
 			return;
 		await DoLeaderboard(bot);
 	}
 
-	void IPlugin.RemoveFunctionality(Bot bot)
-	{
-
-	}
-
 	public async Task DoLeaderboard(Bot bot)
 	{
-		int winners = int.Parse(bot.botState.GetOrDefault(winnerKey, "3"));
+		int winners = int.Parse(bot.Configs[CurrentGuild.Id].GetOrDefault(winnerKey, "3"));
 		new List<IMessage>(Leaderboard.GetMessagesAsync()
 			.ToEnumerable().SelectMany(collection => collection)).ForEach(msg => msg.DeleteAsync().Wait());
 		List<IMessage> allMessages = new(Submissions.GetMessagesAsync()
@@ -113,7 +106,7 @@ public sealed class MemeOfTheWeek : IPlugin
 				await Leaderboard.SendMessageAsync($"**{i + 1}. {allMessages[i].Author.Username} with {allMessages[i].Reactions[Emote].ReactionCount - 1} votes**\n-----:\n\n{allMessages[i].Content}");
 
 		}
-		SetToToday(bot.botState);
+		SetToToday(bot.Configs[CurrentGuild.Id]);
 		await Submissions.DeleteMessagesAsync(allMessages);
 	}
 

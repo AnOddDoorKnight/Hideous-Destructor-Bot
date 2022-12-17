@@ -1,4 +1,5 @@
-﻿using Discord.WebSocket;
+﻿using Discord;
+using Discord.WebSocket;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,8 +8,16 @@ using System.Threading.Tasks;
 
 namespace HideousDestructor.DiscordServer.Plugins;
 
-public class RockAndStone : IPlugin
+public sealed class RockAndStone : Plugin
 {
+	const string key = "RockAndStone";
+	public bool Enabled
+	{
+		get => bool.Parse(bot.Configs[CurrentGuild.Id].GetOrDefault(key, "True"));
+		set => bot.Configs[CurrentGuild.Id][key] = value.ToString();
+	}
+	private Bot bot;
+
 	private static readonly string[] rockAndStone = new string[] 
 	{
 		"rock",
@@ -20,11 +29,21 @@ public class RockAndStone : IPlugin
 	{
 		"cock",
 	};
-	public string Key => nameof(RockAndStone);
-	public void AddFunctionality(Bot bot)
+
+	public RockAndStone(Bot bot, ulong guildID) : base(bot, guildID)
+	{
+		this.bot = bot;
+	}
+
+	public override string Key => nameof(RockAndStone);
+	protected internal override Task OnEnable(Bot bot)
 	{
 		bot.socketClient.MessageReceived += (msg) =>
 		{
+			if (CurrentGuild.GetChannel(msg.Channel.Id) == null)
+				return Task.CompletedTask;
+			if (!Enabled)
+				return Task.CompletedTask;
 			if (msg.Author.Id == bot.socketClient.CurrentUser.Id)
 				return Task.CompletedTask;
 			string content = msg.Content.ToLower();
@@ -34,10 +53,6 @@ public class RockAndStone : IPlugin
 				return msg.Channel.SendMessageAsync(RandomPhraseGenerators.CockAndBone[Random.Shared.Next(RandomPhraseGenerators.CockAndBone.Count)]);
 			return Task.CompletedTask;
 		};
-	}
-
-	public void RemoveFunctionality(Bot bot)
-	{
-		
+		return Task.CompletedTask;
 	}
 }

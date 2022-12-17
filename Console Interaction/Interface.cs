@@ -18,13 +18,13 @@ public static class Interface
 	{
 		// Find token
 		string token;
-		if (BotState.TokenDirectory.Exists)
-			token = BotState.Token!;
+		if (GuildConfig.TokenDirectory.Exists)
+			token = GuildConfig.Token!;
 		else
 		{
 			Console.Write("Type in the bot token: ");
 			token = Console.ReadLine() ?? "";
-			BotState.Token = token;
+			GuildConfig.Token = token;
 		}
 		currentBot = new Bot(token, true);
 
@@ -32,7 +32,7 @@ public static class Interface
 		_ = currentBot.AddPlugin(new MemeOfTheWeek(currentBot, 334151720546598915, 1048792493711425608, 1053082648840519750));
 		_ = currentBot.AddPlugin(new DebugQueue(currentBot, 334151720546598915, 1053370494071607316));
 		_ = currentBot.AddPlugin(new Startup(currentBot, 334151720546598915));
-		_ = currentBot.AddPlugin(new RockAndStone());
+		_ = currentBot.AddPlugin(new RockAndStone(currentBot, 334151720546598915));
 
 		// End
 		Console.WriteLine("Ending on exit");
@@ -46,9 +46,9 @@ public static class Interface
 				string message = Console.ReadLine() ?? "_ _";
 				currentBot.socketClient.GetUser(dmID).SendMessageAsync(message).Wait();
 				goto default;
-			case "force-motw":
-				((MemeOfTheWeek)currentBot.ActivePlugins[0]).DoLeaderboard(currentBot).Wait();
-				goto default;
+			//case "force-motw":
+			//	((MemeOfTheWeek)currentBot.ActivePlugins[0]).DoLeaderboard(currentBot).Wait();
+			//	goto default;
 			case "quit":
 				break;
 			default:

@@ -10,36 +10,34 @@ using System.Threading.Tasks;
 
 namespace HideousDestructor.DiscordServer;
 
-public class DebugQueue : IPlugin
+public class DebugQueue : Plugin
 {
 	const float restartTime = 60f;
 	const int breakPoint = 5;
 	public List<LogMessage> logMessages = new();
 	public Stopwatch updateTime = new();
 
-	public SocketGuild CurrentGuild { get; private set; }
 	public SocketTextChannel ChannelTarget { get; private set; }
 
-	public DebugQueue(Bot bot, ulong guild, ulong Channel)
+	public DebugQueue(Bot bot, ulong guild, ulong Channel) : base(bot, guild)
 	{
-		CurrentGuild = bot.socketClient.GetGuild(guild);
 		ChannelTarget = CurrentGuild.GetTextChannel(Channel);
 	}
 
-	public string Key => nameof(DebugQueue);
+	public override string Key => nameof(DebugQueue);
 
-	public void AddFunctionality(Bot bot)
+	protected internal override async Task OnEnable(Bot bot)
 	{
 		bot.Log += msg =>
 		{
 			logMessages.Add(msg);
 			return Task.CompletedTask;
 		};
-		ChannelTarget.SendMessageAsync($"Connection Started on {DateTime.Now}! Running debugger.").Wait();
+		await ChannelTarget.SendMessageAsync($"Connection Started on {DateTime.Now}! Running debugger.");
 		updateTime.Start();
 	}
 
-	public async Task UpdateFunctionality(Bot bot)
+	protected internal override async Task Update(Bot bot)
 	{
 		if (updateTime.Elapsed.TotalSeconds < restartTime || logMessages.Count > breakPoint)
 			return;
@@ -49,10 +47,5 @@ public class DebugQueue : IPlugin
 			allTasks[i] = ChannelTarget.SendMessageAsync(logMessages[i].ToString());
 		await Task.WhenAll(allTasks);
 		updateTime.Restart();
-	}
-
-	public void RemoveFunctionality(Bot bot)
-	{
-		throw new NotImplementedException();
 	}
 }

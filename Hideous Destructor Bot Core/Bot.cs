@@ -4,6 +4,7 @@ using Discord.WebSocket;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -11,28 +12,36 @@ namespace HideousDestructor.DiscordServer;
 
 public class Bot : IDisposable
 {
+	private bool active = true;
 	public readonly string TokenID;
 	public readonly DiscordSocketClient socketClient;
 	private Thread? autoUpdateThread;
 	public event Func<LogMessage, Task> Log;
 	public async Task SendLog(LogMessage msg) => await Log.Invoke(msg);
 
-	public readonly BotState botState = new() { AutoFlush = true };
+	public IReadOnlyDictionary<ulong, GuildConfig> Configs => configs;//public readonly GuildConfig botState = new() { AutoFlush = true };
+	private readonly Dictionary<ulong, GuildConfig> configs = new();
 
-	public IReadOnlyList<IPlugin> ActivePlugins => activePlugins;
-	private readonly List<IPlugin> activePlugins = new();
-	public Task AddPlugin(IPlugin plugin)
+	public IReadOnlyDictionary<ulong, List<Plugin>> ActivePlugins => activePlugins;
+	private readonly Dictionary<ulong, List<Plugin>> activePlugins = new();
+	public Task AddPlugin(Plugin plugin)
 	{
-		activePlugins.Add(plugin);
-		plugin.AddFunctionality(this);
+		if (activePlugins.TryGetValue(plugin.CurrentGuild.Id, out var list))
+		{
+			configs[plugin.CurrentGuild.Id] = new GuildConfig(plugin.CurrentGuild.Id) { AutoFlush = true };
+			list.Add(plugin);
+		}
+		else
+			activePlugins.Add(plugin.CurrentGuild.Id, new List<Plugin>() { plugin });
+		plugin.OnEnable(this);
 		return Task.CompletedTask;
 	}
-	public Task RemovePlugin(IPlugin plugin)
-	{
-		activePlugins.Remove(plugin);
-		plugin.RemoveFunctionality(this);
-		return Task.CompletedTask;
-	}
+	//public Task RemovePlugin(Plugin plugin)
+	//{
+	//	activePlugins.Remove(plugin.CurrentGuild.Id);
+	//	plugin.OnDisable(this);
+	//	return Task.CompletedTask;
+	//}
 
 	public Bot(string tokenID, bool autoUpdate)
 	{
@@ -53,6 +62,18 @@ public class Bot : IDisposable
 		{
 			return Log.Invoke(message);
 		};
+		socketClient.Disconnected += async (ex) =>
+		{
+			TaskCompletionSource connectionSource = new();
+			socketClient.Ready += Wait;
+			while (!connectionSource.Task.IsCompleted)
+				await Connect();
+			Task Wait()
+			{
+				connectionSource.SetResult();
+				return Task.CompletedTask;
+			}
+		};
 		// var option = new SlashCommandBuilder();
 		// option.WithName("check-alive");
 		// option.WithDescription("Checks if the bot is alive");
@@ -67,7 +88,9 @@ public class Bot : IDisposable
 				while (true)
 				{
 					await Task.Delay(10000);
+					Console.WriteLine("Cycle Starting..");
 					await Update();
+					Console.WriteLine("Cycle Completed!");
 				}
 				Task Wait()
 				{
@@ -80,11 +103,14 @@ public class Bot : IDisposable
 	}
 	public async Task Connect()
 	{
+		if (!active)
+			return;
 		await socketClient.LoginAsync(TokenType.Bot, TokenID, true);
 		await socketClient.StartAsync();
 		TaskCompletionSource source = new();
 		socketClient.Ready += Wait;
 		await source.Task;
+		socketClient.Ready -= Wait;
 		Task Wait()
 		{
 			source.SetResult();
@@ -94,9 +120,10 @@ public class Bot : IDisposable
 	public async Task Update()
 	{
 		List<Task> plugins = new(activePlugins.Count);
-		for (int i = 0; i < activePlugins.Count; i++)
+		using var enumerator = activePlugins.GetEnumerator();
+		while (enumerator.MoveNext())
 		{
-			plugins.Add(activePlugins[i].UpdateFunctionality(this));
+			plugins.AddRange(enumerator.Current.Value.Select(item => item.Update(this)));
 		}
 		await Task.WhenAll(plugins);
 	}
@@ -104,5 +131,6 @@ public class Bot : IDisposable
 	public void Dispose()
 	{
 		socketClient?.StopAsync().Wait();
+		active = false;
 	}
 }
