@@ -8,15 +8,9 @@ using System.Threading.Tasks;
 
 namespace HideousDestructor.DiscordServer.Plugins;
 
-public sealed class RockAndStone : Plugin
+public sealed class RockAndStone : ServerPlugin
 {
 	const string key = "RockAndStone";
-	public bool Enabled
-	{
-		get => bool.Parse(bot.Configs[CurrentGuild.Id].GetOrDefault(key, "True"));
-		set => bot.Configs[CurrentGuild.Id][key] = value.ToString();
-	}
-	private Bot bot;
 
 	private static readonly string[] rockAndStone = new string[] 
 	{
@@ -32,17 +26,16 @@ public sealed class RockAndStone : Plugin
 
 	public RockAndStone(Bot bot, ulong guildID) : base(bot, guildID)
 	{
-		this.bot = bot;
+		
 	}
 
-	public override string Key => nameof(RockAndStone);
+	public static new bool StartEnabled => false;
+
 	protected internal override Task OnEnable(Bot bot)
 	{
 		bot.socketClient.MessageReceived += (msg) =>
 		{
 			if (CurrentGuild.GetChannel(msg.Channel.Id) == null)
-				return Task.CompletedTask;
-			if (!Enabled)
 				return Task.CompletedTask;
 			if (msg.Author.Id == bot.socketClient.CurrentUser.Id)
 				return Task.CompletedTask;

@@ -1,6 +1,8 @@
 ﻿using Discord;
 using Discord.Rest;
 using Discord.WebSocket;
+using HideousDestructor.DiscordServer.IO;
+using HideousDestructor.DiscordServer.Plugins;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -12,30 +14,33 @@ namespace HideousDestructor.DiscordServer;
 
 public class Bot : IDisposable
 {
-	private bool active = true;
 	public readonly string TokenID;
 	public readonly DiscordSocketClient socketClient;
-	private Thread? autoUpdateThread;
 	public event Func<LogMessage, Task> Log;
 	public async Task SendLog(LogMessage msg) => await Log.Invoke(msg);
 
-	public IReadOnlyDictionary<ulong, GuildConfig> Configs => configs;//public readonly GuildConfig botState = new() { AutoFlush = true };
-	private readonly Dictionary<ulong, GuildConfig> configs = new();
+	public SocketGuild[] AllServers => socketClient.Guilds.ToArray();
 
-	public IReadOnlyDictionary<ulong, List<Plugin>> ActivePlugins => activePlugins;
-	private readonly Dictionary<ulong, List<Plugin>> activePlugins = new();
-	public Task AddPlugin(Plugin plugin)
-	{
-		if (activePlugins.TryGetValue(plugin.CurrentGuild.Id, out var list))
-		{
-			configs[plugin.CurrentGuild.Id] = new GuildConfig(plugin.CurrentGuild.Id) { AutoFlush = true };
-			list.Add(plugin);
-		}
-		else
-			activePlugins.Add(plugin.CurrentGuild.Id, new List<Plugin>() { plugin });
-		plugin.OnEnable(this);
-		return Task.CompletedTask;
-	}
+	public readonly PluginManager pluginManager;
+	internal readonly SlashMessageHandler slashMessageHandler;
+
+	//public IReadOnlyDictionary<ulong, GuildConfig> Configs => configs;//public readonly GuildConfig botState = new() { AutoFlush = true };
+	//private readonly Dictionary<ulong, GuildConfig> configs = new();
+	//
+	//public IReadOnlyDictionary<ulong, List<Plugin>> ActivePlugins => activePlugins;
+	//private readonly Dictionary<ulong, List<Plugin>> activePlugins = new();
+	//public Task AddPlugin(Plugin plugin)
+	//{
+	//	if (activePlugins.TryGetValue(plugin.CurrentGuild.Id, out var list))
+	//	{
+	//		configs[plugin.CurrentGuild.Id] = new GuildConfig(plugin.CurrentGuild.Id) { AutoFlush = true };
+	//		list.Add(plugin);
+	//	}
+	//	else
+	//		activePlugins.Add(plugin.CurrentGuild.Id, new List<Plugin>() { plugin });
+	//	plugin.OnEnable(this);
+	//	return Task.CompletedTask;
+	//}
 	//public Task RemovePlugin(Plugin plugin)
 	//{
 	//	activePlugins.Remove(plugin.CurrentGuild.Id);
@@ -43,7 +48,7 @@ public class Bot : IDisposable
 	//	return Task.CompletedTask;
 	//}
 
-	public Bot(string tokenID, bool autoUpdate)
+	public Bot(string tokenID)
 	{
 		Debug.WriteLine($"Creating new bot with token '{tokenID}'..");
 		TokenID = tokenID;
@@ -74,63 +79,28 @@ public class Bot : IDisposable
 				return Task.CompletedTask;
 			}
 		};
-		// var option = new SlashCommandBuilder();
-		// option.WithName("check-alive");
-		// option.WithDescription("Checks if the bot is alive");
-		// await socketClient.Rest.CreateGlobalCommand(option.Build());
-		if (autoUpdate)
-		{
-			autoUpdateThread = new Thread(async () =>
-			{
-				TaskCompletionSource source = new();
-				socketClient.Ready += Wait;
-				await source.Task;
-				while (true)
-				{
-					await Task.Delay(10000);
-					Console.WriteLine("Cycle Starting..");
-					await Update();
-					Console.WriteLine("Cycle Completed!");
-				}
-				Task Wait()
-				{
-					source.SetResult();
-					return Task.CompletedTask;
-				}
-			});
-			autoUpdateThread.Start();
-		}	
+		pluginManager = new PluginManager(this);
+		slashMessageHandler = new SlashMessageHandler(this);
 	}
 	public async Task Connect()
 	{
-		if (!active)
-			return;
 		await socketClient.LoginAsync(TokenType.Bot, TokenID, true);
 		await socketClient.StartAsync();
 		TaskCompletionSource source = new();
 		socketClient.Ready += Wait;
 		await source.Task;
 		socketClient.Ready -= Wait;
+		DataGroup.UpdateDirectories(socketClient.Guilds);
+		pluginManager.AddPlugin(new Startup()).Wait();
 		Task Wait()
 		{
 			source.SetResult();
 			return Task.CompletedTask;
 		}
 	}
-	public async Task Update()
-	{
-		List<Task> plugins = new(activePlugins.Count);
-		using var enumerator = activePlugins.GetEnumerator();
-		while (enumerator.MoveNext())
-		{
-			plugins.AddRange(enumerator.Current.Value.Select(item => item.Update(this)));
-		}
-		await Task.WhenAll(plugins);
-	}
 
 	public void Dispose()
 	{
 		socketClient?.StopAsync().Wait();
-		active = false;
 	}
 }

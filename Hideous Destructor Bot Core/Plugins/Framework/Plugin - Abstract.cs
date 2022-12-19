@@ -6,28 +6,39 @@ using System.Threading.Tasks;
 
 namespace HideousDestructor.DiscordServer;
 
-
-public abstract class Plugin
+public abstract class ServerPlugin
 {
-	public abstract string Key { get; }
+	public static bool StartEnabled => false;
 	public SocketGuild CurrentGuild { get; }
 
-	public Plugin(Bot bot, ulong guildID)
+	public ServerPlugin(Bot bot, ulong guildID)
 	{
 		CurrentGuild = bot.socketClient.GetGuild(guildID);
 	}
-
 
 	protected internal virtual Task OnEnable(Bot bot)
 	{
 		return Task.CompletedTask;
 	}
-
 	protected internal virtual Task Update(Bot bot)
 	{
 		return Task.CompletedTask;
 	}
-
+	protected internal virtual Task OnDisable(Bot bot)
+	{
+		return Task.CompletedTask;
+	}
+}
+public abstract class GlobalPlugin
+{
+	protected internal virtual Task OnEnable(Bot bot)
+	{
+		return Task.CompletedTask;
+	}
+	protected internal virtual Task Update(Bot bot)
+	{
+		return Task.CompletedTask;
+	}
 	protected internal virtual Task OnDisable(Bot bot)
 	{
 		return Task.CompletedTask;

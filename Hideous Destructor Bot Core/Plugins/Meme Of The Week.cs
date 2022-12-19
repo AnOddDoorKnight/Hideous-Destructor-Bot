@@ -6,47 +6,80 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.IO;
+using HideousDestructor.DiscordServer.IO;
 
 namespace HideousDestructor.DiscordServer.Plugins;
 
-public sealed class MemeOfTheWeek : Plugin
+public sealed class MemeOfTheWeek : ServerPlugin
 {
-	const string timeKey = "MemeOfTheWeek",
-		winnerKey = "MemeOfTheWeek-Winners";
-	// Do wednesday
-	internal static bool PassedDay(GuildConfig state)
+	private SimpleXmlDocument xmlDocument;
+
+	private const string lastDate = "lastDateDone";
+	public DateTime LastDate
 	{
-		if (state.Contents.TryGetValue(timeKey, out string? value))
-		{
-			DateTime time = DateTime.Parse(value);
-			TimeSpan span = DateTime.Today - time;
-			if (span.TotalDays >= 7f)
-				return false;
-			return true;
-		}
-		SetToToday(state);
-		return false;
+		get => DateTime.Parse(xmlDocument.GetOrDefault(lastDate, default(DateTime).ToString()));
+		set => xmlDocument[lastDate] = value.ToString();
 	}
-	private static void SetToToday(GuildConfig botState)
+
+	private const string doOnDayOfWeek = "doOnDayOfWeek";
+	public DayOfWeek DayOfWeek
 	{
-		botState[timeKey] = DateTime.Today.ToString();
+		get => Enum.Parse<DayOfWeek>(xmlDocument.GetOrDefault(doOnDayOfWeek, ((DayOfWeek)0).ToString()));
+		set => xmlDocument[doOnDayOfWeek] = value.ToString();
 	}
+	public bool IsOnDayOfWeek =>
+		(DateTime.Today.DayOfWeek == DayOfWeek && (DateTime.Today - LastDate).TotalDays >= 1.15d)
+		|| (DateTime.Today - LastDate).TotalDays > 8d;
+
+	private const string winnerCount = "winnerCount";
+	public int WinnerCount
+	{
+		get => int.Parse(xmlDocument.GetOrDefault(winnerCount, "3"));
+		set => xmlDocument[winnerCount] = value.ToString();
+	}
+
+	public static new bool StartEnabled => true;
+
+
 	public SocketTextChannel Submissions { get; private set; }
-	public SocketTextChannel Leaderboard { get; private set; }
-	public IEmote Emote { get; private set; }
-	//private readonly List<IMessage> messages = new();
-	public MemeOfTheWeek(Bot bot, ulong guildID, ulong submissionsID, ulong leaderboardID) : base(bot, guildID)
+	private const string submissionsKey = "submissionsID";
+	public ulong SubmissionsID
 	{
-		Submissions = CurrentGuild.GetTextChannel(submissionsID);
-		Leaderboard = CurrentGuild.GetTextChannel(leaderboardID);
-		Emote = CurrentGuild.Emotes.First(emote => emote.Name == "upvote");
+		get => ulong.Parse(xmlDocument.GetOrDefault(submissionsKey, "1048792493711425608"));
+		set
+		{
+			xmlDocument[submissionsKey] = value.ToString();
+			Submissions = CurrentGuild.GetTextChannel(value);
+		}
+	}
+	public SocketTextChannel Leaderboard { get; private set; }
+	private const string leaderboardKey = "leaderboardID";
+	public ulong LeaderboardID
+	{
+		get => ulong.Parse(xmlDocument.GetOrDefault(leaderboardKey, "1053082648840519750"));
+		set
+		{
+			xmlDocument[leaderboardKey] = value.ToString();
+			Submissions = CurrentGuild.GetTextChannel(value);
+		}
 	}
 
-	public override string Key => nameof(MemeOfTheWeek);
+	public IEmote Emote { get; private set; }
+	private readonly Bot bot;
 
-	protected internal override Task OnEnable(Bot bot)
+	public MemeOfTheWeek(Bot bot, ulong guildID) : base(bot, guildID)
+	{
+		xmlDocument = new(guildID, "Meme Of The Week");
+		Submissions = CurrentGuild.GetTextChannel(SubmissionsID);
+		Leaderboard = CurrentGuild.GetTextChannel(LeaderboardID);
+		Emote = CurrentGuild.Emotes.First(emote => emote.Name == "upvote");
+		this.bot = bot;
+	}
+
+	protected internal override async Task OnEnable(Bot bot)
 	{
 		bot.socketClient.MessageReceived += MessageRecieved;
+		await SetGlobalCommands(bot);
 
 		// Upvotes all previous messages
 		Thread addReactions = new Thread(async () =>
@@ -72,29 +105,64 @@ public sealed class MemeOfTheWeek : Plugin
 						goto end;
 				}
 			}
-			end:
+		end:
 			await Task.WhenAll(queuedMessages);
 		});
 		addReactions.Start();
-		return Task.CompletedTask;
 	}
-
+	private async Task SetGlobalCommands(Bot client)
+	{
+		const string name = "motw";
+		//IReadOnlyCollection<SocketApplicationCommand> collection = await client.GetGlobalApplicationCommandsAsync();
+		//if (collection.Any(item => item.Name == name))
+		//	return;
+		var command = new SlashCommandBuilder()
+		{
+			Name = name,
+			Description = "Meme of the week settings",
+			IsDefaultPermission = true,
+			IsDMEnabled = false,
+		};
+		command.AddOption("force", ApplicationCommandOptionType.SubCommand, "forces the motw to pass");
+		await client.socketClient.Rest.CreateGuildCommand(command.Build(), CurrentGuild.Id);
+		client.socketClient.SlashCommandExecuted += async (msg) =>
+		{
+			if (CurrentGuild.GetChannel(msg.ChannelId!.Value) == null)
+				return;
+			if (msg.CommandName != "motw" || msg.Data.Options.First().Name != "force")
+				return;
+			_ = ForceLeaderboardChangeCommand(msg);
+		};
+	}
 	protected internal override async Task Update(Bot bot)
 	{
-		if (PassedDay(bot.Configs[CurrentGuild.Id]))
+		if (!IsOnDayOfWeek)
 			return;
 		await DoLeaderboard(bot);
 	}
 
+	private async Task ForceLeaderboardChangeCommand(SocketSlashCommand msg)
+	{
+		await msg.DeferAsync(false);
+		DateTime time = DateTime.Today;
+		do
+			time = time.AddDays(1d);
+		while (time.DayOfWeek != DayOfWeek.Wednesday);
+		await DoLeaderboard(bot);
+		await msg.ModifyOriginalResponseAsync(properties =>
+		{
+			properties.Content = new Optional<string>($"Forced! Next expected time to start again is at {time.ToShortDateString()}, approximately {(time - DateTime.Today).TotalDays:N0} days from now!");
+		});
+	}
 	public async Task DoLeaderboard(Bot bot)
 	{
-		int winners = int.Parse(bot.Configs[CurrentGuild.Id].GetOrDefault(winnerKey, "3"));
+
 		new List<IMessage>(Leaderboard.GetMessagesAsync()
 			.ToEnumerable().SelectMany(collection => collection)).ForEach(msg => msg.DeleteAsync().Wait());
 		List<IMessage> allMessages = new(Submissions.GetMessagesAsync()
 			.ToEnumerable().SelectMany(collection => collection)
 			.OrderByDescending(message => message.Reactions[Emote].ReactionCount));
-		for (int i = 0; i < Math.Min(allMessages.Count, winners); i++)
+		for (int i = 0; i < Math.Min(allMessages.Count, WinnerCount); i++)
 		{
 			if (allMessages[i].Attachments.Count > 0)
 			{
@@ -106,7 +174,7 @@ public sealed class MemeOfTheWeek : Plugin
 				await Leaderboard.SendMessageAsync($"**{i + 1}. {allMessages[i].Author.Username} with {allMessages[i].Reactions[Emote].ReactionCount - 1} votes**\n-----:\n\n{allMessages[i].Content}");
 
 		}
-		SetToToday(bot.Configs[CurrentGuild.Id]);
+		LastDate = DateTime.Today;
 		await Submissions.DeleteMessagesAsync(allMessages);
 	}
 
@@ -114,10 +182,7 @@ public sealed class MemeOfTheWeek : Plugin
 	{
 		if (socketMessage.Channel.Id != Submissions.Id)
 			return;
-		//await ((ITextChannel)socketMessage.Channel).CreateThreadAsync(null,  autoArchiveDuration: ThreadArchiveDuration.OneDay)
-		//	.ContinueWith((task) => task.Result.SendMessageAsync("Ass"));
 		await socketMessage.AddReactionAsync(Emote);
 
 	}
-
 }
