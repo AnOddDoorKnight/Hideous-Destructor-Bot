@@ -6,10 +6,44 @@ using System.Diagnostics;
 using System.Linq;
 using System.Reactive.Concurrency;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace HideousDestructor.DiscordServer;
 
+public sealed class Delay<T> : IDisposable
+{
+	public bool Active => !currentTask.IsCompleted;
+	private readonly Task currentTask;
+	private readonly CancellationTokenSource cancellation = new();
+	private readonly Queue<T> queuedStrings = new();
+	public Delay(Action<T> toDelegate, T startingValue, int milliseconds)
+	{
+		queuedStrings.Enqueue(startingValue);
+		currentTask = Action();
+		async Task Action()
+		{
+			while (queuedStrings.Count > 0 && !cancellation.IsCancellationRequested)
+			{
+				await Task.Delay(milliseconds);
+				toDelegate.Invoke(queuedStrings.Dequeue());
+			}
+		}
+	}
+
+	public void Enqueue(T value) => queuedStrings.Enqueue(value);
+	
+	public Task Stop()
+	{
+		cancellation.Cancel();
+		return currentTask;
+	}
+
+	void IDisposable.Dispose()
+	{
+		Stop().Wait();
+	}
+}
 //public class DebugQueue : Plugin
 //{
 //	const float restartTime = 60f;

@@ -29,9 +29,13 @@ public static class Interface
 		currentBot = new Bot(token);
 
 		await currentBot.Connect();
-		await currentBot.pluginManager.AddPlugin(new MemeOfTheWeek(currentBot, 334151720546598915));
-		await currentBot.pluginManager.AddPlugin(new FunAndGames(currentBot, 334151720546598915));
-		await currentBot.pluginManager.AddPlugin(new RockAndStone(currentBot, 334151720546598915));
+		using var enumerator = currentBot.Guilds.GetEnumerator();
+		while (enumerator.MoveNext())
+		{
+			await enumerator.Current.Value.AddPlugin(new MemeOfTheWeek(currentBot, enumerator.Current.Key));
+			await enumerator.Current.Value.AddPlugin(new FunAndGames(currentBot, enumerator.Current.Key));
+			await enumerator.Current.Value.AddPlugin(new RockAndStone(currentBot, enumerator.Current.Key));
+		}
 
 		// End
 		Console.WriteLine("Ending on exit");

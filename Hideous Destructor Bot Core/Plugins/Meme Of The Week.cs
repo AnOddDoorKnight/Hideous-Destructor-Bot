@@ -125,13 +125,14 @@ public sealed class MemeOfTheWeek : ServerPlugin
 		};
 		command.AddOption("force", ApplicationCommandOptionType.SubCommand, "forces the motw to pass");
 		await client.socketClient.Rest.CreateGuildCommand(command.Build(), CurrentGuild.Id);
-		client.socketClient.SlashCommandExecuted += async (msg) =>
+		client.socketClient.SlashCommandExecuted += (msg) =>
 		{
 			if (CurrentGuild.GetChannel(msg.ChannelId!.Value) == null)
-				return;
+				return Task.CompletedTask;
 			if (msg.CommandName != "motw" || msg.Data.Options.First().Name != "force")
-				return;
+				return Task.CompletedTask;
 			_ = ForceLeaderboardChangeCommand(msg);
+			return Task.CompletedTask;
 		};
 	}
 	protected internal override async Task Update(Bot bot)

@@ -9,7 +9,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-
 namespace HideousDestructor.DiscordServer;
 
 public class Bot : IDisposable
@@ -19,34 +18,21 @@ public class Bot : IDisposable
 	public event Func<LogMessage, Task> Log;
 	public async Task SendLog(LogMessage msg) => await Log.Invoke(msg);
 
-	public SocketGuild[] AllServers => socketClient.Guilds.ToArray();
+	public IReadOnlyDictionary<ulong, GuildManager> Guilds => guildPlugins;
+	private Dictionary<ulong, GuildManager> guildPlugins = new();
+	public GuildManager AddNewGuild(SocketGuild guild)
+	{
+		GuildManager output = new(this, guild);
+		guildPlugins.Add(guild.Id, output);
+		return output;
+	}
+	public Task<GuildManager.ServerPluginMetadata> AddServerPlugin(ServerPlugin serverPlugin)
+	{
+		return guildPlugins[serverPlugin.CurrentGuild.Id].AddPlugin(serverPlugin);
+	}
 
-	public readonly PluginManager pluginManager;
+	public GlobalPluginManager GlobalPlugins { get; }
 	internal readonly SlashMessageHandler slashMessageHandler;
-
-	//public IReadOnlyDictionary<ulong, GuildConfig> Configs => configs;//public readonly GuildConfig botState = new() { AutoFlush = true };
-	//private readonly Dictionary<ulong, GuildConfig> configs = new();
-	//
-	//public IReadOnlyDictionary<ulong, List<Plugin>> ActivePlugins => activePlugins;
-	//private readonly Dictionary<ulong, List<Plugin>> activePlugins = new();
-	//public Task AddPlugin(Plugin plugin)
-	//{
-	//	if (activePlugins.TryGetValue(plugin.CurrentGuild.Id, out var list))
-	//	{
-	//		configs[plugin.CurrentGuild.Id] = new GuildConfig(plugin.CurrentGuild.Id) { AutoFlush = true };
-	//		list.Add(plugin);
-	//	}
-	//	else
-	//		activePlugins.Add(plugin.CurrentGuild.Id, new List<Plugin>() { plugin });
-	//	plugin.OnEnable(this);
-	//	return Task.CompletedTask;
-	//}
-	//public Task RemovePlugin(Plugin plugin)
-	//{
-	//	activePlugins.Remove(plugin.CurrentGuild.Id);
-	//	plugin.OnDisable(this);
-	//	return Task.CompletedTask;
-	//}
 
 	public Bot(string tokenID)
 	{
@@ -69,6 +55,7 @@ public class Bot : IDisposable
 		};
 		socketClient.Disconnected += async (ex) =>
 		{
+			Console.WriteLine(ex);
 			TaskCompletionSource connectionSource = new();
 			socketClient.Ready += Wait;
 			while (!connectionSource.Task.IsCompleted)
@@ -79,7 +66,7 @@ public class Bot : IDisposable
 				return Task.CompletedTask;
 			}
 		};
-		pluginManager = new PluginManager(this);
+		GlobalPlugins = new GlobalPluginManager(this);
 		slashMessageHandler = new SlashMessageHandler(this);
 	}
 	public async Task Connect()
@@ -91,16 +78,16 @@ public class Bot : IDisposable
 		await source.Task;
 		socketClient.Ready -= Wait;
 		DataGroup.UpdateDirectories(socketClient.Guilds);
-		pluginManager.AddPlugin(new Startup()).Wait();
+		GlobalPlugins.AddPlugin(new Startup()).Wait();
 		Task Wait()
 		{
 			source.SetResult();
 			return Task.CompletedTask;
 		}
 	}
-
 	public void Dispose()
 	{
+		GC.SuppressFinalize(this);
 		socketClient?.StopAsync().Wait();
 	}
 }
